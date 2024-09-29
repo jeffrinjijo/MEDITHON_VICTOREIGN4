@@ -16,8 +16,9 @@ import java.util.Timer;
 
 public class DiabetesAppF {
     private static boolean insulinTaken = false;
-    private static final String THINGSPEAK_API_KEY = "CIT4RWXB271CI47S";
-    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2671583/fields/1.json?api_key=CIT4RWXB271CI47S" + THINGSPEAK_API_KEY;
+    private static final int REQUIRED_DOSAGE = 20; // The required insulin dosage
+    private static final String THINGSPEAK_API_KEY = "K3N1WQXO6H59IFMP";
+    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2675380/fields/1.json?api_key=K3N1WQXO6H59IFMP" + THINGSPEAK_API_KEY;
 
     private static Timer shortIntervalTimer1 = new Timer();
     private static Timer shortIntervalTimer2 = new Timer();
@@ -26,7 +27,7 @@ public class DiabetesAppF {
     public static void main(String[] args) {
         // Create JFrame for the window
         JFrame frame = new JFrame("Diabetes App");
-        frame.setSize(400, 200);
+        frame.setSize(400, 300);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // Label to show insulin status
@@ -34,19 +35,42 @@ public class DiabetesAppF {
         label.setBounds(50, 50, 300, 20);
         frame.add(label);
 
+        // Label to show dosage input
+        JLabel dosageLabel = new JLabel("Enter Insulin Dosage:");
+        dosageLabel.setBounds(50, 100, 150, 20);
+        frame.add(dosageLabel);
+
+        // Text field for dosage input
+        JTextField dosageField = new JTextField();
+        dosageField.setBounds(200, 100, 100, 20);
+        frame.add(dosageField);
+
         // Button to mark insulin as taken
-        JButton button = new JButton("Take Insulin");
-        button.setBounds(100, 100, 150, 30);
+        JButton button = new JButton("Submit Dosage");
+        button.setBounds(100, 150, 150, 30);
         frame.add(button);
 
         // Button action listener
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                insulinTaken = true;
-                label.setText("Insulin taken.");
-                saveToDatabase();
-                cancelAlarms(); // Cancel alarms when insulin is taken
+                // Get the dosage entered by the user
+                String dosageText = dosageField.getText();
+                try {
+                    int enteredDosage = Integer.parseInt(dosageText);
+
+                    // Check if the dosage is exactly 20 units
+                    if (enteredDosage == REQUIRED_DOSAGE) {
+                        insulinTaken = true;
+                        label.setText("Insulin taken correctly.");
+                        saveToDatabase(enteredDosage);
+                        cancelAlarms(); // Cancel alarms when insulin is taken
+                    } else {
+                        label.setText("Incorrect dosage! Please enter exactly 20 units.");
+                    }
+                } catch (NumberFormatException ex) {
+                    label.setText("Invalid input! Please enter a valid number.");
+                }
             }
         });
 
@@ -57,7 +81,7 @@ public class DiabetesAppF {
         // Fetch data from ThingSpeak
         fetchThingSpeakData();
 
-        // Schedule reminders at short intervals (1 minute apart)
+        // Schedule reminders at short intervals (1-minute intervals for testing)
         scheduleShortIntervalReminders();
     }
 
@@ -82,7 +106,7 @@ public class DiabetesAppF {
     }
 
     // Method to save insulin data to SQLite database
-    private static void saveToDatabase() {
+    private static void saveToDatabase(int dosage) {
         try {
             Connection connection = DriverManager.getConnection("jdbc:sqlite:diabetes.db");
             Statement statement = connection.createStatement();
@@ -91,8 +115,8 @@ public class DiabetesAppF {
             String sql = "CREATE TABLE IF NOT EXISTS InsulinLog (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, dosage INTEGER)";
             statement.execute(sql);
 
-            // Insert a sample record
-            String insertSql = "INSERT INTO InsulinLog (date, dosage) VALUES (CURRENT_TIMESTAMP, 10)";
+            // Insert a record with current timestamp and the dosage
+            String insertSql = "INSERT INTO InsulinLog (date, dosage) VALUES (CURRENT_TIMESTAMP, " + dosage + ")";
             statement.execute(insertSql);
 
             statement.close();
@@ -159,4 +183,3 @@ public class DiabetesAppF {
         shortIntervalTimer3 = new Timer();
     }
 }
-
