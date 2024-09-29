@@ -1,5 +1,3 @@
-package org.example;
-
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -14,7 +12,7 @@ import java.util.*;
 import java.awt.Toolkit;
 import java.util.Timer;
 
-public class DiabetesAppF {
+public class DiabetesApp {
     private static boolean insulinTaken = false;
     private static final int REQUIRED_DOSAGE = 20; // The required insulin dosage
     private static final String THINGSPEAK_API_KEY = "K3N1WQXO6H59IFMP";
@@ -183,3 +181,5 @@ public class DiabetesAppF {
         shortIntervalTimer3 = new Timer();
     }
 }
+
+
