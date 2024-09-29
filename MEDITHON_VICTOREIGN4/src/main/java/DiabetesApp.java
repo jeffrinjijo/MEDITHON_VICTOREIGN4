@@ -1,32 +1,40 @@
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.*;
-import java.awt.Toolkit;
+import java.util.Calendar;
 import java.util.Timer;
+import java.util.TimerTask;
 
-public class DiabetesApp{
+public class DiabetesApp {
     private static boolean insulinTaken = false;
     private static final int REQUIRED_DOSAGE = 20; // The required insulin dosage
     private static final String THINGSPEAK_API_KEY = "K3N1WQXO6H59IFMP";
-    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2675380/fields/1.json?api_key=K3N1WQXO6H59IFMP" + THINGSPEAK_API_KEY;
+    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2675380/feeds.json?api_key=" + THINGSPEAK_API_KEY + "&results=1";
 
     private static Timer shortIntervalTimer1 = new Timer();
     private static Timer shortIntervalTimer2 = new Timer();
     private static Timer shortIntervalTimer3 = new Timer();
 
+    // UI components for sensor data
+    private static JLabel flowRateLabel;
+    private static JLabel tempLabel;
+    private static JLabel humidityLabel;
+
     public static void main(String[] args) {
         // Create JFrame for the window
         JFrame frame = new JFrame("Diabetes App");
-        frame.setSize(400, 300);
+        frame.setSize(400, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // Label to show insulin status
@@ -34,8 +42,18 @@ public class DiabetesApp{
         label.setBounds(50, 50, 300, 20);
         frame.add(label);
 
-        // Button to fetch and check insulin dosage from the database
-        JButton button = new JButton("Fetch Dosage");
+        // Label to show dosage input
+        JLabel dosageLabel = new JLabel("Enter Insulin Dosage:");
+        dosageLabel.setBounds(50, 100, 150, 20);
+        frame.add(dosageLabel);
+
+        // Text field for dosage input
+        JTextField dosageField = new JTextField();
+        dosageField.setBounds(200, 100, 100, 20);
+        frame.add(dosageField);
+
+        // Button to mark insulin as taken
+        JButton button = new JButton("Submit Dosage");
         button.setBounds(100, 150, 150, 30);
         frame.add(button);
 
@@ -43,59 +61,51 @@ public class DiabetesApp{
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Get the latest dosage from the database
-                int enteredDosage = getLatestDosageFromDatabase();
+                // Get the dosage entered by the user
+                String dosageText = dosageField.getText();
+                try {
+                    int enteredDosage = Integer.parseInt(dosageText);
 
-                // Check if the dosage is exactly 20 units
-                if (enteredDosage == REQUIRED_DOSAGE) {
-                    insulinTaken = true;
-                    label.setText("Insulin taken correctly.");
-                    saveToDatabase(enteredDosage);
-                    cancelAlarms(); // Cancel alarms when insulin is taken
-                } else if (enteredDosage == -1) {
-                    label.setText("No dosage found in the database!");
-                } else {
-                    label.setText("Incorrect dosage! Please ensure the correct dosage is taken.");
+                    // Check if the dosage is exactly 20 units
+                    if (enteredDosage == REQUIRED_DOSAGE) {
+                        insulinTaken = true;
+                        label.setText("Insulin taken correctly.");
+                        saveToDatabase(enteredDosage);
+                        cancelAlarms(); // Cancel alarms when insulin is taken
+                    } else {
+                        label.setText("Incorrect dosage! Please enter exactly 20 units.");
+                    }
+                } catch (NumberFormatException ex) {
+                    label.setText("Invalid input! Please enter a valid number.");
                 }
             }
         });
+
+        // Labels to display sensor data
+        flowRateLabel = new JLabel("Flow Rate: ");
+        flowRateLabel.setBounds(50, 180, 300, 20);
+        frame.add(flowRateLabel);
+
+        tempLabel = new JLabel("Temperature: ");
+        tempLabel.setBounds(50, 210, 300, 20);
+        frame.add(tempLabel);
+
+        humidityLabel = new JLabel("Humidity: ");
+        humidityLabel.setBounds(50, 240, 300, 20);
+        frame.add(humidityLabel);
 
         // Set layout and make the window visible
         frame.setLayout(null);
         frame.setVisible(true);
 
-        // Fetch data from ThingSpeak
-        fetchThingSpeakData();
+        // Fetch data from ThingSpeak and schedule periodic updates
+        scheduleDataFetching();
 
         // Schedule reminders at short intervals (1-minute intervals for testing)
         scheduleShortIntervalReminders();
     }
 
-    // Method to fetch the latest dosage from the InsulinLog table in the SQLite database
-    private static int getLatestDosageFromDatabase() {
-        int latestDosage = -1; // Default value in case of an error
-        try {
-            Connection connection = DriverManager.getConnection("jdbc:sqlite:diabetes.db");
-            Statement statement = connection.createStatement();
-
-            // Query to fetch the latest dosage entry
-            String query = "SELECT dosage FROM InsulinLog ORDER BY id DESC LIMIT 1";
-            ResultSet resultSet = statement.executeQuery(query);
-
-            if (resultSet.next()) {
-                latestDosage = resultSet.getInt("dosage");  // Retrieve the latest dosage
-            }
-
-            resultSet.close();
-            statement.close();
-            connection.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return latestDosage;
-    }
-
-    // Method to fetch data from ThingSpeak
+    // Method to fetch data from ThingSpeak and display sensor values on the UI
     private static void fetchThingSpeakData() {
         OkHttpClient client = new OkHttpClient();
 
@@ -107,12 +117,40 @@ public class DiabetesApp{
             if (response.isSuccessful()) {
                 String jsonResponse = response.body().string();
                 System.out.println("Fetched Data from ThingSpeak: " + jsonResponse);
+
+                // Parse the JSON response
+                JSONObject json = new JSONObject(jsonResponse);
+                JSONArray feeds = json.getJSONArray("feeds");
+                JSONObject latestEntry = feeds.getJSONObject(0);
+
+                float flowRate = latestEntry.getFloat("field1");
+                int proximityValue = latestEntry.getInt("field2");
+                int forceValue = latestEntry.getInt("field3");
+                float temperature = latestEntry.getFloat("field4");
+                float humidity = latestEntry.getFloat("field5");
+
+                // Update the UI with the sensor values
+                flowRateLabel.setText("Flow Rate: " + flowRate + " L/min");
+                tempLabel.setText("Temperature: " + temperature + "°C");
+                humidityLabel.setText("Humidity: " + humidity + "%");
+
             } else {
                 System.out.println("Failed to fetch data from ThingSpeak. Response code: " + response.code());
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    // Schedule data fetching from ThingSpeak every minute
+    private static void scheduleDataFetching() {
+        Timer fetchTimer = new Timer();
+        fetchTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                fetchThingSpeakData();  // Fetch data from ThingSpeak and update UI
+            }
+        }, 0, 60000); // Fetch every 60 seconds
     }
 
     // Method to save insulin data to SQLite database
