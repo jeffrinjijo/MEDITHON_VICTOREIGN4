@@ -7,12 +7,13 @@ import okhttp3.Response;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
 import java.awt.Toolkit;
 import java.util.Timer;
 
-public class DiabetesApp {
+public class DiabetesApp{
     private static boolean insulinTaken = false;
     private static final int REQUIRED_DOSAGE = 20; // The required insulin dosage
     private static final String THINGSPEAK_API_KEY = "K3N1WQXO6H59IFMP";
@@ -33,18 +34,8 @@ public class DiabetesApp {
         label.setBounds(50, 50, 300, 20);
         frame.add(label);
 
-        // Label to show dosage input
-        JLabel dosageLabel = new JLabel("Enter Insulin Dosage:");
-        dosageLabel.setBounds(50, 100, 150, 20);
-        frame.add(dosageLabel);
-
-        // Text field for dosage input
-        JTextField dosageField = new JTextField();
-        dosageField.setBounds(200, 100, 100, 20);
-        frame.add(dosageField);
-
-        // Button to mark insulin as taken
-        JButton button = new JButton("Submit Dosage");
+        // Button to fetch and check insulin dosage from the database
+        JButton button = new JButton("Fetch Dosage");
         button.setBounds(100, 150, 150, 30);
         frame.add(button);
 
@@ -52,22 +43,19 @@ public class DiabetesApp {
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Get the dosage entered by the user
-                String dosageText = dosageField.getText();
-                try {
-                    int enteredDosage = Integer.parseInt(dosageText);
+                // Get the latest dosage from the database
+                int enteredDosage = getLatestDosageFromDatabase();
 
-                    // Check if the dosage is exactly 20 units
-                    if (enteredDosage == REQUIRED_DOSAGE) {
-                        insulinTaken = true;
-                        label.setText("Insulin taken correctly.");
-                        saveToDatabase(enteredDosage);
-                        cancelAlarms(); // Cancel alarms when insulin is taken
-                    } else {
-                        label.setText("Incorrect dosage! Please enter exactly 20 units.");
-                    }
-                } catch (NumberFormatException ex) {
-                    label.setText("Invalid input! Please enter a valid number.");
+                // Check if the dosage is exactly 20 units
+                if (enteredDosage == REQUIRED_DOSAGE) {
+                    insulinTaken = true;
+                    label.setText("Insulin taken correctly.");
+                    saveToDatabase(enteredDosage);
+                    cancelAlarms(); // Cancel alarms when insulin is taken
+                } else if (enteredDosage == -1) {
+                    label.setText("No dosage found in the database!");
+                } else {
+                    label.setText("Incorrect dosage! Please ensure the correct dosage is taken.");
                 }
             }
         });
@@ -81,6 +69,30 @@ public class DiabetesApp {
 
         // Schedule reminders at short intervals (1-minute intervals for testing)
         scheduleShortIntervalReminders();
+    }
+
+    // Method to fetch the latest dosage from the InsulinLog table in the SQLite database
+    private static int getLatestDosageFromDatabase() {
+        int latestDosage = -1; // Default value in case of an error
+        try {
+            Connection connection = DriverManager.getConnection("jdbc:sqlite:diabetes.db");
+            Statement statement = connection.createStatement();
+
+            // Query to fetch the latest dosage entry
+            String query = "SELECT dosage FROM InsulinLog ORDER BY id DESC LIMIT 1";
+            ResultSet resultSet = statement.executeQuery(query);
+
+            if (resultSet.next()) {
+                latestDosage = resultSet.getInt("dosage");  // Retrieve the latest dosage
+            }
+
+            resultSet.close();
+            statement.close();
+            connection.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return latestDosage;
     }
 
     // Method to fetch data from ThingSpeak
@@ -181,5 +193,3 @@ public class DiabetesApp {
         shortIntervalTimer3 = new Timer();
     }
 }
-
-
