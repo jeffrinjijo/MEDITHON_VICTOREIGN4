@@ -5,8 +5,8 @@
 // ThingSpeak settings
 const char* ssid = "Ruban"; // Your WiFi SSID
 const char* password = "Ruban125"; // Your WiFi password
-unsigned long channelID = 2675380; // ThingSpeak Channel ID
-const char* writeAPIKey = "K3N1WQXO6H59IFMP";  // ThingSpeak Write API Key
+unsigned long channelID = 2675875; // ThingSpeak Channel ID
+const char* writeAPIKey = "HKORNH8SIVUVSD5A";  // ThingSpeak Write API Key
 
 WiFiClient client;
 

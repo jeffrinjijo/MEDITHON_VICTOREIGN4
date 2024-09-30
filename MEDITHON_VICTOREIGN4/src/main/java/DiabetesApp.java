@@ -19,8 +19,8 @@ import java.util.TimerTask;
 public class DiabetesApp {
     private static boolean insulinTaken = false;
     private static final int REQUIRED_DOSAGE = 20; // The required insulin dosage
-    private static final String THINGSPEAK_API_KEY = "K3N1WQXO6H59IFMP";
-    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2675380/feeds.json?api_key=" + THINGSPEAK_API_KEY + "&results=1";
+    private static final String THINGSPEAK_API_KEY = "HKORNH8SIVUVSD5A";
+    private static final String THINGSPEAK_CHANNEL_URL = "https://api.thingspeak.com/channels/2675875/feeds.json?api_key=" + THINGSPEAK_API_KEY + "&results=1";
 
     private static Timer shortIntervalTimer1 = new Timer();
     private static Timer shortIntervalTimer2 = new Timer();
